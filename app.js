@@ -120,11 +120,11 @@ async function handleLookup(event) {
     renderFollowingCards(followingRows, followingMeta);
   }
   if (modVipRes.status === "fulfilled") {
-    renderRoleCards(els.vipsOut, vipRows, "VIP не найдены");
-    renderRoleCards(els.modsOut, modRows, "Модераторы не найдены");
+    renderRoleCards(els.vipsOut, vipRows, "VIP не найдены", "vip");
+    renderRoleCards(els.modsOut, modRows, "Модераторы не найдены", "mod");
   }
   if (foundersRes.status === "fulfilled") {
-    renderRoleCards(els.foundersOut, founderRows, "Основатели не найдены");
+    renderRoleCards(els.foundersOut, founderRows, "Основатели не найдены", "founder");
   }
 
   els.vipsCount.textContent = String(counters.vips);
@@ -234,25 +234,31 @@ function renderFollowingCards(rows, meta) {
   renderUserGrid(els.followingOut, rows, { showDate: false });
 }
 
-function renderRoleCards(target, rows, emptyText) {
+function renderRoleCards(target, rows, emptyText, roleType) {
   const sorted = [...rows].sort((a, b) => timestampForSort(b.dateRaw) - timestampForSort(a.dateRaw));
   if (sorted.length === 0) {
     target.innerHTML = `<p class="empty">${escapeHtml(emptyText)}</p>`;
     return;
   }
-  renderUserGrid(target, sorted, { showDate: true });
+  renderUserGrid(target, sorted, { showDate: true, roleType });
 }
 
 function renderUserGrid(target, rows, options) {
   const body = rows
     .map((row) => {
       const title = row.displayName || row.login || "unknown";
-      const subtitle = options.showDate ? formatDate(row.dateRaw) : "";
+      const founderBadge =
+        options.roleType === "founder" ? renderFounderBadge(row.isSubscribed) : "";
+      let subtitle = "";
+      if (options.showDate) {
+        subtitle = formatDate(row.dateRaw);
+      }
       return `
         <article class="person-card">
           ${renderAvatar(row.avatarUrl, title)}
           <div class="person-meta">
             <p class="person-name">${escapeHtml(title)}</p>
+            ${founderBadge}
             ${subtitle ? `<p class="person-sub">${escapeHtml(subtitle)}</p>` : ""}
           </div>
         </article>
@@ -661,7 +667,7 @@ function pickArray(data, keys, allowRootArray = false) {
 function normalizeRoleEntry(raw, role) {
   if (typeof raw === "string") {
     const login = normalizeLogin(raw);
-    return { login, displayName: raw, avatarUrl: "", dateRaw: null };
+    return { login, displayName: raw, avatarUrl: "", dateRaw: null, isSubscribed: null };
   }
   const login = normalizeLogin(
     firstString(raw, ["login", "userLogin", "user_login", "name", "username", "userName"]),
@@ -680,6 +686,7 @@ function normalizeRoleEntry(raw, role) {
     displayName: displayName || login || "unknown",
     avatarUrl: "",
     dateRaw: firstValue(raw, dateFieldsByRole(role)),
+    isSubscribed: role === "founder" ? parseBooleanOrNull(firstValue(raw, ["isSubscribed"])) : null,
   };
 }
 
@@ -717,6 +724,30 @@ function firstValue(obj, keys) {
     if (value !== null && value !== undefined && value !== "") return value;
   }
   return null;
+}
+
+function parseBooleanOrNull(value) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true") return true;
+    if (normalized === "false") return false;
+  }
+  if (typeof value === "number") {
+    if (value === 1) return true;
+    if (value === 0) return false;
+  }
+  return null;
+}
+
+function renderFounderBadge(isSubscribed) {
+  if (isSubscribed === true) {
+    return '<span class="state-badge state-on">Подписан</span>';
+  }
+  if (isSubscribed === false) {
+    return '<span class="state-badge state-off">Нет подписки</span>';
+  }
+  return '<span class="state-badge state-unknown">Статус неизвестен</span>';
 }
 
 function timestampForSort(raw) {
