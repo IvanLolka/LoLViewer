@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Twitch Viewer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <section class="hero">
+        <h1>LoL Viewer</h1>
+        <p class="subtitle">
+          Смотрим подписки и роли на канале.
+        </p>
+      </section>
+
+      <section class="panel controls">
+        <form id="lookup-form" novalidate>
+          <label for="login">Ник Twitch</label>
+          <div class="row">
+            <input
+              id="login"
+              name="login"
+              type="text"
+              autocomplete="off"
+              placeholder="например, ipsilon210"
+              required
+            />
+            <button id="lookup-button" type="submit">Показать</button>
+          </div>
+        </form>
+        <p id="global-status" class="status" aria-live="polite"></p>
+      </section>
+
+      <section id="summary" class="summary-grid"></section>
+
+      <section class="tabs">
+        <button class="tab-btn is-active" data-tab="following-tab" type="button">
+          Подписки
+        </button>
+        <button class="tab-btn" data-tab="roles-tab" type="button">
+          Роли людей на канале
+        </button>
+      </section>
+
+      <section id="following-tab" class="tab-panel panel is-active">
+        <div class="panel-head">
+          <h2>Подписки</h2>
+          <p id="following-meta" class="meta"></p>
+        </div>
+        <div id="following-output" class="card-grid-wrap"></div>
+      </section>
+
+      <section id="roles-tab" class="tab-panel panel">
+        <div class="roles-layout">
+          <article class="role-block">
+            <div class="panel-head role-head">
+              <h3>Вип</h3>
+              <span id="vips-count" class="count-badge">0</span>
+            </div>
+            <div id="vips-output" class="card-grid-wrap compact"></div>
+          </article>
+
+          <article class="role-block">
+            <div class="panel-head role-head">
+              <h3>Модераторы</h3>
+              <span id="mods-count" class="count-badge">0</span>
+            </div>
+            <div id="mods-output" class="card-grid-wrap compact"></div>
+          </article>
+
+          <article class="role-block">
+            <div class="panel-head role-head">
+              <h3>Основатели</h3>
+              <span id="founders-count" class="count-badge">0</span>
+            </div>
+            <div id="founders-output" class="card-grid-wrap compact"></div>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <script src="./app.js" defer></script>
+  </body>
+</html>
