@@ -1,4 +1,4 @@
-"use strict";
+﻿"use strict";
 
 const TWITCH_GQL_ENDPOINT = "https://gql.twitch.tv/gql";
 const TWITCH_INTEGRITY_ENDPOINT = "https://gql.twitch.tv/integrity";
@@ -14,6 +14,15 @@ const integrityState = {
   token: "",
   expiration: 0,
 };
+
+const FOLLOWING_DEBUG_LEVEL = detectFollowingDebugLevel();
+
+if (typeof window !== "undefined") {
+  window.__FOLLOWING_DEBUG__ = {
+    level: FOLLOWING_DEBUG_LEVEL,
+    hint: "Use ?followingDebug=1 for verbose logs, ?followingDebug=0 to mute.",
+  };
+}
 
 const els = {
   form: document.getElementById("lookup-form"),
@@ -40,19 +49,83 @@ els.tabButtons.forEach((button) => {
 
 renderEmptyState();
 
+function detectFollowingDebugLevel() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const fromQuery = params.get("followingDebug");
+    if (fromQuery === "0") return 0;
+    if (fromQuery === "1") return 2;
+
+    const fromStorage = localStorage.getItem("followingDebug");
+    if (fromStorage === "0") return 0;
+    if (fromStorage === "1") return 2;
+  } catch {
+    // ignore
+  }
+  // default: warnings/errors only
+  return 1;
+}
+
+function logFollowingDebug(level, message, context) {
+  const isVerbose = FOLLOWING_DEBUG_LEVEL >= 2;
+  const shouldLog =
+    FOLLOWING_DEBUG_LEVEL > 0 && (level === "error" || level === "warn" || isVerbose);
+  if (!shouldLog) return;
+
+  const prefix = "[FollowingDebug]";
+  const fn =
+    level === "error"
+      ? console.error
+      : level === "warn"
+        ? console.warn
+        : level === "info"
+          ? console.info
+          : console.log;
+  if (context !== undefined) {
+    fn(`${prefix} ${message}`, context);
+  } else {
+    fn(`${prefix} ${message}`);
+  }
+}
+
+function createFollowingRunContext(login) {
+  const runId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  return {
+    runId,
+    login,
+    origin: safeWindowValue(() => window.location.origin),
+    page: safeWindowValue(() => window.location.href),
+    ua: safeWindowValue(() => navigator.userAgent),
+  };
+}
+
+function safeWindowValue(getter) {
+  try {
+    return getter();
+  } catch {
+    return "";
+  }
+}
+
+function shortCursor(cursor) {
+  if (!cursor) return "";
+  const value = String(cursor);
+  return value.length > 18 ? `${value.slice(0, 8)}...${value.slice(-8)}` : value;
+}
+
 async function handleLookup(event) {
   event.preventDefault();
   const login = normalizeLogin(els.login.value);
 
   if (!login) {
-    setStatus("Введите ник Twitch.", "error");
+    setStatus("Р’РІРµРґРёС‚Рµ РЅРёРє Twitch.", "error");
     els.login.focus();
     return;
   }
 
   setLoading(true);
   clearOutputs();
-  setStatus("Загружаю данные...", "loading");
+  setStatus("Р—Р°РіСЂСѓР¶Р°СЋ РґР°РЅРЅС‹Рµ...", "loading");
 
   const [followingRes, modVipRes, foundersRes] = await Promise.allSettled([
     fetchFollowing(login),
@@ -120,11 +193,11 @@ async function handleLookup(event) {
     renderFollowingCards(followingRows, followingMeta);
   }
   if (modVipRes.status === "fulfilled") {
-    renderRoleCards(els.vipsOut, vipRows, "VIP не найдены", "vip");
-    renderRoleCards(els.modsOut, modRows, "Модераторы не найдены", "mod");
+    renderRoleCards(els.vipsOut, vipRows, "VIP РЅРµ РЅР°Р№РґРµРЅС‹", "vip");
+    renderRoleCards(els.modsOut, modRows, "РњРѕРґРµСЂР°С‚РѕСЂС‹ РЅРµ РЅР°Р№РґРµРЅС‹", "mod");
   }
   if (foundersRes.status === "fulfilled") {
-    renderRoleCards(els.foundersOut, founderRows, "Основатели не найдены", "founder");
+    renderRoleCards(els.foundersOut, founderRows, "РћСЃРЅРѕРІР°С‚РµР»Рё РЅРµ РЅР°Р№РґРµРЅС‹", "founder");
   }
 
   els.vipsCount.textContent = String(counters.vips);
@@ -133,13 +206,13 @@ async function handleLookup(event) {
   renderSummary(counters);
 
   if (failures === 0 && !hasWarnings) {
-    setStatus("Готово. Данные загружены.", "ok");
+    setStatus("Р“РѕС‚РѕРІРѕ. Р”Р°РЅРЅС‹Рµ Р·Р°РіСЂСѓР¶РµРЅС‹.", "ok");
   } else if (failures === 0 && hasWarnings) {
-    setStatus("Данные загружены частично: Twitch ограничил часть страниц following.", "error");
+    setStatus("Р”Р°РЅРЅС‹Рµ Р·Р°РіСЂСѓР¶РµРЅС‹ С‡Р°СЃС‚РёС‡РЅРѕ: Twitch РѕРіСЂР°РЅРёС‡РёР» С‡Р°СЃС‚СЊ СЃС‚СЂР°РЅРёС† following.", "error");
   } else if (failures < 3) {
-    setStatus("Часть данных загружена, часть запросов завершилась ошибкой.", "error");
+    setStatus("Р§Р°СЃС‚СЊ РґР°РЅРЅС‹С… Р·Р°РіСЂСѓР¶РµРЅР°, С‡Р°СЃС‚СЊ Р·Р°РїСЂРѕСЃРѕРІ Р·Р°РІРµСЂС€РёР»Р°СЃСЊ РѕС€РёР±РєРѕР№.", "error");
   } else {
-    setStatus("Не удалось загрузить данные. Проверь ник и доступность API.", "error");
+    setStatus("РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ РґР°РЅРЅС‹Рµ. РџСЂРѕРІРµСЂСЊ РЅРёРє Рё РґРѕСЃС‚СѓРїРЅРѕСЃС‚СЊ API.", "error");
   }
 
   setLoading(false);
@@ -190,20 +263,20 @@ function renderEmptyState() {
   els.modsCount.textContent = "0";
   els.foundersCount.textContent = "0";
   els.followingMeta.textContent = "";
-  els.followingOut.innerHTML = '<p class="empty">Список появится после запроса.</p>';
-  els.vipsOut.innerHTML = '<p class="empty">Список появится после запроса.</p>';
-  els.modsOut.innerHTML = '<p class="empty">Список появится после запроса.</p>';
-  els.foundersOut.innerHTML = '<p class="empty">Список появится после запроса.</p>';
-  setStatus("Введите ник и нажмите «Показать».", "");
+  els.followingOut.innerHTML = '<p class="empty">РЎРїРёСЃРѕРє РїРѕСЏРІРёС‚СЃСЏ РїРѕСЃР»Рµ Р·Р°РїСЂРѕСЃР°.</p>';
+  els.vipsOut.innerHTML = '<p class="empty">РЎРїРёСЃРѕРє РїРѕСЏРІРёС‚СЃСЏ РїРѕСЃР»Рµ Р·Р°РїСЂРѕСЃР°.</p>';
+  els.modsOut.innerHTML = '<p class="empty">РЎРїРёСЃРѕРє РїРѕСЏРІРёС‚СЃСЏ РїРѕСЃР»Рµ Р·Р°РїСЂРѕСЃР°.</p>';
+  els.foundersOut.innerHTML = '<p class="empty">РЎРїРёСЃРѕРє РїРѕСЏРІРёС‚СЃСЏ РїРѕСЃР»Рµ Р·Р°РїСЂРѕСЃР°.</p>';
+  setStatus("Р’РІРµРґРёС‚Рµ РЅРёРє Рё РЅР°Р¶РјРёС‚Рµ В«РџРѕРєР°Р·Р°С‚СЊВ».", "");
   activateTab("following-tab");
 }
 
 function renderSummary(counters) {
   const cards = [
-    { label: "Подписки", value: counters.following },
+    { label: "РџРѕРґРїРёСЃРєРё", value: counters.following },
     { label: "VIP", value: counters.vips },
-    { label: "Модераторы", value: counters.mods },
-    { label: "Основатели", value: counters.founders },
+    { label: "РњРѕРґРµСЂР°С‚РѕСЂС‹", value: counters.mods },
+    { label: "РћСЃРЅРѕРІР°С‚РµР»Рё", value: counters.founders },
   ];
 
   els.summary.innerHTML = cards
@@ -221,13 +294,13 @@ function renderSummary(counters) {
 function renderFollowingCards(rows, meta) {
   const notes = [];
   const totalText = Number.isFinite(meta.total) ? String(meta.total) : "n/a";
-  notes.push(`Всего: ${totalText}`);
-  notes.push(`Показано: ${rows.length}`);
-  if (meta.warning) notes.push(`Остановлено: ${meta.warning}`);
-  els.followingMeta.textContent = notes.join(" • ");
+  notes.push(`Р’СЃРµРіРѕ: ${totalText}`);
+  notes.push(`РџРѕРєР°Р·Р°РЅРѕ: ${rows.length}`);
+  if (meta.warning) notes.push(`РћСЃС‚Р°РЅРѕРІР»РµРЅРѕ: ${meta.warning}`);
+  els.followingMeta.textContent = notes.join(" вЂў ");
 
   if (rows.length === 0) {
-    els.followingOut.innerHTML = '<p class="empty">Подписки не найдены.</p>';
+    els.followingOut.innerHTML = '<p class="empty">РџРѕРґРїРёСЃРєРё РЅРµ РЅР°Р№РґРµРЅС‹.</p>';
     return;
   }
 
@@ -282,24 +355,56 @@ function renderError(target, error) {
 }
 
 async function fetchFollowing(login) {
+  const run = createFollowingRunContext(login);
+  logFollowingDebug("info", "Following load started", run);
+
   try {
-    return await fetchFollowingViaFollowsQuery(login);
+    const result = await fetchFollowingViaFollowsQuery(login, run);
+    logFollowingDebug("info", "Following load finished via follows", {
+      runId: run.runId,
+      login,
+      total: result.total,
+      loaded: result.items.length,
+      partialError: result.partialError || "",
+    });
+    return result;
   } catch (primaryError) {
     const text = humanError(primaryError);
+    logFollowingDebug("warn", "Primary follows query failed", {
+      runId: run.runId,
+      login,
+      error: text,
+    });
+
     if (text.includes('Cannot query field "follows"')) {
-      return fetchFollowingViaLegacyQuery(login);
+      const result = await fetchFollowingViaLegacyQuery(login, run);
+      logFollowingDebug("info", "Following load finished via legacy fallback", {
+        runId: run.runId,
+        login,
+        total: result.total,
+        loaded: result.items.length,
+        partialError: result.partialError || "",
+      });
+      return result;
     }
+    logFollowingDebug("error", "Following load failed with no fallback", {
+      runId: run.runId,
+      login,
+      error: text,
+    });
     throw primaryError;
   }
 }
 
-async function fetchFollowingViaFollowsQuery(login) {
+async function fetchFollowingViaFollowsQuery(login, run) {
   let cursor = null;
   let total = null;
   const items = [];
   const seenCursors = new Set();
+  let pageIndex = 0;
 
   while (true) {
+    pageIndex += 1;
     const payload = {
       operationName: "UserFollows",
       variables: { login, first: 100, after: cursor },
@@ -325,10 +430,33 @@ async function fetchFollowingViaFollowsQuery(login) {
       `,
     };
 
+    logFollowingDebug("info", "Requesting follows page", {
+      runId: run?.runId || "",
+      login,
+      pageIndex,
+      first: payload.variables.first,
+      cursor: shortCursor(payload.variables.after),
+      loadedBefore: items.length,
+    });
+
     let json;
     try {
-      json = await postGql(payload);
+      json = await postGql(payload, {
+        runId: run?.runId || "",
+        login,
+        source: "follows",
+        pageIndex,
+        cursor: shortCursor(payload.variables.after),
+      });
     } catch (error) {
+      logFollowingDebug("warn", "Follows page request failed", {
+        runId: run?.runId || "",
+        login,
+        pageIndex,
+        cursor: shortCursor(payload.variables.after),
+        loadedBefore: items.length,
+        error: humanError(error),
+      });
       if (items.length > 0) {
         return { total, items, partialError: humanError(error) };
       }
@@ -336,7 +464,7 @@ async function fetchFollowingViaFollowsQuery(login) {
     }
 
     const user = json?.data?.user;
-    if (!user) throw new Error("Пользователь не найден в Twitch.");
+    if (!user) throw new Error("РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ РІ Twitch.");
 
     const follows = user.follows;
     total = follows?.totalCount ?? total;
@@ -351,6 +479,16 @@ async function fetchFollowingViaFollowsQuery(login) {
 
     const hasNextPage = Boolean(follows?.pageInfo?.hasNextPage);
     const nextCursor = follows?.pageInfo?.endCursor || null;
+    logFollowingDebug("info", "Follows page parsed", {
+      runId: run?.runId || "",
+      login,
+      pageIndex,
+      total,
+      edges: edges.length,
+      loadedAfter: items.length,
+      hasNextPage,
+      nextCursor: shortCursor(nextCursor),
+    });
     if (!hasNextPage || !nextCursor || seenCursors.has(nextCursor)) break;
     seenCursors.add(nextCursor);
     cursor = nextCursor;
@@ -359,13 +497,15 @@ async function fetchFollowingViaFollowsQuery(login) {
   return { total, items, partialError: "" };
 }
 
-async function fetchFollowingViaLegacyQuery(login) {
+async function fetchFollowingViaLegacyQuery(login, run) {
   let cursor = null;
   let total = null;
   const items = [];
   const seenCursors = new Set();
+  let pageIndex = 0;
 
   while (true) {
+    pageIndex += 1;
     const payload = {
       operationName: "UserFollowing",
       variables: { login, first: 100, after: cursor },
@@ -391,10 +531,33 @@ async function fetchFollowingViaLegacyQuery(login) {
       `,
     };
 
+    logFollowingDebug("info", "Requesting legacy following page", {
+      runId: run?.runId || "",
+      login,
+      pageIndex,
+      first: payload.variables.first,
+      cursor: shortCursor(payload.variables.after),
+      loadedBefore: items.length,
+    });
+
     let json;
     try {
-      json = await postGql(payload);
+      json = await postGql(payload, {
+        runId: run?.runId || "",
+        login,
+        source: "following",
+        pageIndex,
+        cursor: shortCursor(payload.variables.after),
+      });
     } catch (error) {
+      logFollowingDebug("warn", "Legacy following page request failed", {
+        runId: run?.runId || "",
+        login,
+        pageIndex,
+        cursor: shortCursor(payload.variables.after),
+        loadedBefore: items.length,
+        error: humanError(error),
+      });
       if (items.length > 0) {
         return { total, items, partialError: humanError(error) };
       }
@@ -402,7 +565,7 @@ async function fetchFollowingViaLegacyQuery(login) {
     }
 
     const user = json?.data?.user;
-    if (!user) throw new Error("Пользователь не найден в Twitch.");
+    if (!user) throw new Error("РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ РІ Twitch.");
 
     const following = user.following;
     total = following?.total ?? total;
@@ -417,6 +580,16 @@ async function fetchFollowingViaLegacyQuery(login) {
 
     const hasNextPage = Boolean(following?.pageInfo?.hasNextPage);
     const nextCursor = following?.pageInfo?.endCursor || null;
+    logFollowingDebug("info", "Legacy following page parsed", {
+      runId: run?.runId || "",
+      login,
+      pageIndex,
+      total,
+      edges: edges.length,
+      loadedAfter: items.length,
+      hasNextPage,
+      nextCursor: shortCursor(nextCursor),
+    });
     if (!hasNextPage || !nextCursor || seenCursors.has(nextCursor)) break;
     seenCursors.add(nextCursor);
     cursor = nextCursor;
@@ -428,33 +601,79 @@ async function fetchFollowingViaLegacyQuery(login) {
 function normalizeFollowingError(error) {
   const msg = humanError(error).toLowerCase();
   if (msg.includes("failed integrity check")) {
-    return new Error("Twitch ограничил пагинацию following (failed integrity check).");
+    logFollowingDebug("warn", "normalizeFollowingError: failed integrity check", { error: msg });
+    return new Error("Twitch blocked following pagination (failed integrity check).");
   }
   if (msg.includes("service error")) {
-    return new Error("Twitch временно ограничивает публичный following.");
+    logFollowingDebug("warn", "normalizeFollowingError: service error", { error: msg });
+    return new Error("Twitch temporarily limits public following data.");
+  }
+  if (msg.includes("failed to fetch") || msg.includes("networkerror")) {
+    logFollowingDebug("warn", "normalizeFollowingError: network or CORS issue", { error: msg });
   }
   return error instanceof Error ? error : new Error(String(error));
 }
 
-async function postGql(payload) {
-  let json = await postGqlOnce(payload, false);
+async function postGql(payload, debugMeta = {}) {
+  let json = await postGqlOnce(payload, false, debugMeta);
   let message = gqlErrorMessage(json);
+  if (message) {
+    logFollowingDebug("warn", "GQL responded with errors", {
+      ...debugMeta,
+      operationName: payload?.operationName || "",
+      message,
+    });
+  }
   if (message.toLowerCase().includes("failed integrity check")) {
-    json = await postGqlOnce(payload, true);
+    logFollowingDebug("warn", "Retrying request after integrity refresh", {
+      ...debugMeta,
+      operationName: payload?.operationName || "",
+    });
+    json = await postGqlOnce(payload, true, debugMeta);
     message = gqlErrorMessage(json);
   }
   if (message) throw new Error(message);
   return json;
 }
 
-async function postGqlOnce(payload, forceRefreshIntegrity) {
+async function postGqlOnce(payload, forceRefreshIntegrity, debugMeta = {}) {
   const headers = await buildGqlHeaders(forceRefreshIntegrity);
-  const response = await fetch(TWITCH_GQL_ENDPOINT, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) throw new Error(`Following: HTTP ${response.status}`);
+
+  let response;
+  try {
+    response = await fetch(TWITCH_GQL_ENDPOINT, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+    });
+  } catch (error) {
+    logFollowingDebug("error", "Network error during GQL request", {
+      ...debugMeta,
+      operationName: payload?.operationName || "",
+      forceRefreshIntegrity,
+      error: humanError(error),
+    });
+    throw error;
+  }
+
+  if (!response.ok) {
+    let bodyPreview = "";
+    try {
+      bodyPreview = (await response.text()).slice(0, 300);
+    } catch {
+      bodyPreview = "";
+    }
+    logFollowingDebug("error", "GQL returned non-OK HTTP status", {
+      ...debugMeta,
+      operationName: payload?.operationName || "",
+      forceRefreshIntegrity,
+      status: response.status,
+      statusText: response.statusText,
+      bodyPreview,
+    });
+    throw new Error(`Following: HTTP ${response.status}`);
+  }
+
   return response.json();
 }
 
@@ -742,12 +961,12 @@ function parseBooleanOrNull(value) {
 
 function renderFounderBadge(isSubscribed) {
   if (isSubscribed === true) {
-    return '<span class="state-badge state-on">Подписан</span>';
+    return '<span class="state-badge state-on">РџРѕРґРїРёСЃР°РЅ</span>';
   }
   if (isSubscribed === false) {
-    return '<span class="state-badge state-off">Нет подписки</span>';
+    return '<span class="state-badge state-off">РќРµС‚ РїРѕРґРїРёСЃРєРё</span>';
   }
-  return '<span class="state-badge state-unknown">Статус неизвестен</span>';
+  return '<span class="state-badge state-unknown">РЎС‚Р°С‚СѓСЃ РЅРµРёР·РІРµСЃС‚РµРЅ</span>';
 }
 
 function timestampForSort(raw) {
@@ -762,7 +981,7 @@ function timestampForSort(raw) {
 }
 
 function formatDate(raw) {
-  if (!raw) return "Дата неизвестна";
+  if (!raw) return "Р”Р°С‚Р° РЅРµРёР·РІРµСЃС‚РЅР°";
   const stamp = timestampForSort(raw);
   if (!stamp) return String(raw);
   const date = new Date(stamp);
@@ -775,7 +994,7 @@ function formatDate(raw) {
 
 function humanError(error) {
   if (error instanceof Error) return error.message;
-  return "Неизвестная ошибка запроса";
+  return "РќРµРёР·РІРµСЃС‚РЅР°СЏ РѕС€РёР±РєР° Р·Р°РїСЂРѕСЃР°";
 }
 
 function escapeHtml(value) {
@@ -786,3 +1005,4 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
 }
+
