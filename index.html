@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -16,25 +16,23 @@
   <body>
     <main class="app">
       <section class="hero">
-        <h1>LoL Viewer</h1>
-        <p class="subtitle">
-          Смотрим подписки и роли на канале.
-        </p>
+        <h1>Twitch Viewer</h1>
+        <p class="subtitle">Track followed channels and channel roles.</p>
       </section>
 
       <section class="panel controls">
         <form id="lookup-form" novalidate>
-          <label for="login">Ник Twitch</label>
+          <label for="login">Twitch Login</label>
           <div class="row">
             <input
               id="login"
               name="login"
               type="text"
               autocomplete="off"
-              placeholder="например, ipsilon210"
+              placeholder="for example, ipsilon210"
               required
             />
-            <button id="lookup-button" type="submit">Показать</button>
+            <button id="lookup-button" type="submit">Show</button>
           </div>
         </form>
         <p id="global-status" class="status" aria-live="polite"></p>
@@ -44,16 +42,16 @@
 
       <section class="tabs">
         <button class="tab-btn is-active" data-tab="following-tab" type="button">
-          Подписки
+          Following
         </button>
         <button class="tab-btn" data-tab="roles-tab" type="button">
-          Роли людей на канале
+          Channel Roles
         </button>
       </section>
 
       <section id="following-tab" class="tab-panel panel is-active">
         <div class="panel-head">
-          <h2>Подписки</h2>
+          <h2>Following</h2>
           <p id="following-meta" class="meta"></p>
         </div>
         <div id="following-output" class="card-grid-wrap"></div>
@@ -63,7 +61,7 @@
         <div class="roles-layout">
           <article class="role-block">
             <div class="panel-head role-head">
-              <h3>Вип</h3>
+              <h3>VIP</h3>
               <span id="vips-count" class="count-badge">0</span>
             </div>
             <div id="vips-output" class="card-grid-wrap compact"></div>
@@ -71,7 +69,7 @@
 
           <article class="role-block">
             <div class="panel-head role-head">
-              <h3>Модераторы</h3>
+              <h3>Moderators</h3>
               <span id="mods-count" class="count-badge">0</span>
             </div>
             <div id="mods-output" class="card-grid-wrap compact"></div>
@@ -79,7 +77,7 @@
 
           <article class="role-block">
             <div class="panel-head role-head">
-              <h3>Основатели</h3>
+              <h3>Founders</h3>
               <span id="founders-count" class="count-badge">0</span>
             </div>
             <div id="founders-output" class="card-grid-wrap compact"></div>

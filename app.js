@@ -118,14 +118,14 @@ async function handleLookup(event) {
   const login = normalizeLogin(els.login.value);
 
   if (!login) {
-    setStatus("Р’РІРµРґРёС‚Рµ РЅРёРє Twitch.", "error");
+    setStatus("Введите ник Twitch.", "error");
     els.login.focus();
     return;
   }
 
   setLoading(true);
   clearOutputs();
-  setStatus("Р—Р°РіСЂСѓР¶Р°СЋ РґР°РЅРЅС‹Рµ...", "loading");
+  setStatus("Загружаю данные...", "loading");
 
   const [followingRes, modVipRes, foundersRes] = await Promise.allSettled([
     fetchFollowing(login),
@@ -193,11 +193,11 @@ async function handleLookup(event) {
     renderFollowingCards(followingRows, followingMeta);
   }
   if (modVipRes.status === "fulfilled") {
-    renderRoleCards(els.vipsOut, vipRows, "VIP РЅРµ РЅР°Р№РґРµРЅС‹", "vip");
-    renderRoleCards(els.modsOut, modRows, "РњРѕРґРµСЂР°С‚РѕСЂС‹ РЅРµ РЅР°Р№РґРµРЅС‹", "mod");
+    renderRoleCards(els.vipsOut, vipRows, "VIP не найдены", "vip");
+    renderRoleCards(els.modsOut, modRows, "Модераторы не найдены", "mod");
   }
   if (foundersRes.status === "fulfilled") {
-    renderRoleCards(els.foundersOut, founderRows, "РћСЃРЅРѕРІР°С‚РµР»Рё РЅРµ РЅР°Р№РґРµРЅС‹", "founder");
+    renderRoleCards(els.foundersOut, founderRows, "Основатели не найдены", "founder");
   }
 
   els.vipsCount.textContent = String(counters.vips);
@@ -206,13 +206,13 @@ async function handleLookup(event) {
   renderSummary(counters);
 
   if (failures === 0 && !hasWarnings) {
-    setStatus("Р“РѕС‚РѕРІРѕ. Р”Р°РЅРЅС‹Рµ Р·Р°РіСЂСѓР¶РµРЅС‹.", "ok");
+    setStatus("Готово. Данные загружены.", "ok");
   } else if (failures === 0 && hasWarnings) {
-    setStatus("Р”Р°РЅРЅС‹Рµ Р·Р°РіСЂСѓР¶РµРЅС‹ С‡Р°СЃС‚РёС‡РЅРѕ: Twitch РѕРіСЂР°РЅРёС‡РёР» С‡Р°СЃС‚СЊ СЃС‚СЂР°РЅРёС† following.", "error");
+    setStatus("Данные загружены частично: Twitch ограничил часть страниц following.", "error");
   } else if (failures < 3) {
-    setStatus("Р§Р°СЃС‚СЊ РґР°РЅРЅС‹С… Р·Р°РіСЂСѓР¶РµРЅР°, С‡Р°СЃС‚СЊ Р·Р°РїСЂРѕСЃРѕРІ Р·Р°РІРµСЂС€РёР»Р°СЃСЊ РѕС€РёР±РєРѕР№.", "error");
+    setStatus("Часть данных загружена, часть запросов завершилась ошибкой.", "error");
   } else {
-    setStatus("РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ РґР°РЅРЅС‹Рµ. РџСЂРѕРІРµСЂСЊ РЅРёРє Рё РґРѕСЃС‚СѓРїРЅРѕСЃС‚СЊ API.", "error");
+    setStatus("Не удалось загрузить данные. Проверь ник и доступность API.", "error");
   }
 
   setLoading(false);
@@ -263,20 +263,20 @@ function renderEmptyState() {
   els.modsCount.textContent = "0";
   els.foundersCount.textContent = "0";
   els.followingMeta.textContent = "";
-  els.followingOut.innerHTML = '<p class="empty">РЎРїРёСЃРѕРє РїРѕСЏРІРёС‚СЃСЏ РїРѕСЃР»Рµ Р·Р°РїСЂРѕСЃР°.</p>';
-  els.vipsOut.innerHTML = '<p class="empty">РЎРїРёСЃРѕРє РїРѕСЏРІРёС‚СЃСЏ РїРѕСЃР»Рµ Р·Р°РїСЂРѕСЃР°.</p>';
-  els.modsOut.innerHTML = '<p class="empty">РЎРїРёСЃРѕРє РїРѕСЏРІРёС‚СЃСЏ РїРѕСЃР»Рµ Р·Р°РїСЂРѕСЃР°.</p>';
-  els.foundersOut.innerHTML = '<p class="empty">РЎРїРёСЃРѕРє РїРѕСЏРІРёС‚СЃСЏ РїРѕСЃР»Рµ Р·Р°РїСЂРѕСЃР°.</p>';
-  setStatus("Р’РІРµРґРёС‚Рµ РЅРёРє Рё РЅР°Р¶РјРёС‚Рµ В«РџРѕРєР°Р·Р°С‚СЊВ».", "");
+  els.followingOut.innerHTML = '<p class="empty">Список появится после запроса.</p>';
+  els.vipsOut.innerHTML = '<p class="empty">Список появится после запроса.</p>';
+  els.modsOut.innerHTML = '<p class="empty">Список появится после запроса.</p>';
+  els.foundersOut.innerHTML = '<p class="empty">Список появится после запроса.</p>';
+  setStatus("Введите ник и нажмите «Показать».", "");
   activateTab("following-tab");
 }
 
 function renderSummary(counters) {
   const cards = [
-    { label: "РџРѕРґРїРёСЃРєРё", value: counters.following },
+    { label: "Подписки", value: counters.following },
     { label: "VIP", value: counters.vips },
-    { label: "РњРѕРґРµСЂР°С‚РѕСЂС‹", value: counters.mods },
-    { label: "РћСЃРЅРѕРІР°С‚РµР»Рё", value: counters.founders },
+    { label: "Модераторы", value: counters.mods },
+    { label: "Основатели", value: counters.founders },
   ];
 
   els.summary.innerHTML = cards
@@ -294,13 +294,13 @@ function renderSummary(counters) {
 function renderFollowingCards(rows, meta) {
   const notes = [];
   const totalText = Number.isFinite(meta.total) ? String(meta.total) : "n/a";
-  notes.push(`Р’СЃРµРіРѕ: ${totalText}`);
-  notes.push(`РџРѕРєР°Р·Р°РЅРѕ: ${rows.length}`);
-  if (meta.warning) notes.push(`РћСЃС‚Р°РЅРѕРІР»РµРЅРѕ: ${meta.warning}`);
-  els.followingMeta.textContent = notes.join(" вЂў ");
+  notes.push(`Всего: ${totalText}`);
+  notes.push(`Показано: ${rows.length}`);
+  if (meta.warning) notes.push(`Остановлено: ${meta.warning}`);
+  els.followingMeta.textContent = notes.join(" • ");
 
   if (rows.length === 0) {
-    els.followingOut.innerHTML = '<p class="empty">РџРѕРґРїРёСЃРєРё РЅРµ РЅР°Р№РґРµРЅС‹.</p>';
+    els.followingOut.innerHTML = '<p class="empty">Подписки не найдены.</p>';
     return;
   }
 
@@ -464,7 +464,7 @@ async function fetchFollowingViaFollowsQuery(login, run) {
     }
 
     const user = json?.data?.user;
-    if (!user) throw new Error("РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ РІ Twitch.");
+    if (!user) throw new Error("Пользователь не найден в Twitch.");
 
     const follows = user.follows;
     total = follows?.totalCount ?? total;
@@ -565,7 +565,7 @@ async function fetchFollowingViaLegacyQuery(login, run) {
     }
 
     const user = json?.data?.user;
-    if (!user) throw new Error("РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ РІ Twitch.");
+    if (!user) throw new Error("Пользователь не найден в Twitch.");
 
     const following = user.following;
     total = following?.total ?? total;
@@ -961,12 +961,12 @@ function parseBooleanOrNull(value) {
 
 function renderFounderBadge(isSubscribed) {
   if (isSubscribed === true) {
-    return '<span class="state-badge state-on">РџРѕРґРїРёСЃР°РЅ</span>';
+    return '<span class="state-badge state-on">Подписан</span>';
   }
   if (isSubscribed === false) {
-    return '<span class="state-badge state-off">РќРµС‚ РїРѕРґРїРёСЃРєРё</span>';
+    return '<span class="state-badge state-off">Нет подписки</span>';
   }
-  return '<span class="state-badge state-unknown">РЎС‚Р°С‚СѓСЃ РЅРµРёР·РІРµСЃС‚РµРЅ</span>';
+  return '<span class="state-badge state-unknown">Статус неизвестен</span>';
 }
 
 function timestampForSort(raw) {
@@ -981,7 +981,7 @@ function timestampForSort(raw) {
 }
 
 function formatDate(raw) {
-  if (!raw) return "Р”Р°С‚Р° РЅРµРёР·РІРµСЃС‚РЅР°";
+  if (!raw) return "Дата неизвестна";
   const stamp = timestampForSort(raw);
   if (!stamp) return String(raw);
   const date = new Date(stamp);
@@ -994,7 +994,7 @@ function formatDate(raw) {
 
 function humanError(error) {
   if (error instanceof Error) return error.message;
-  return "РќРµРёР·РІРµСЃС‚РЅР°СЏ РѕС€РёР±РєР° Р·Р°РїСЂРѕСЃР°";
+  return "Неизвестная ошибка запроса";
 }
 
 function escapeHtml(value) {
