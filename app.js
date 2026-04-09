@@ -9,6 +9,8 @@ const IVR_FOUNDERS_ENDPOINT = "https://api.ivr.fi/v2/twitch/founders/";
 const IVR_USER_ENDPOINT = "https://api.ivr.fi/v2/twitch/user?login=";
 
 const DEVICE_ID_STORAGE_KEY = "twitch-tools-device-id";
+const DEVICE_ID_OVERRIDE_STORAGE_KEY = "twitch-tools-device-id-override";
+const INTEGRITY_TOKEN_STORAGE_KEY = "twitch-tools-client-integrity";
 
 const integrityState = {
   token: "",
@@ -16,11 +18,13 @@ const integrityState = {
 };
 
 const FOLLOWING_DEBUG_LEVEL = detectFollowingDebugLevel();
+const FOLLOWING_PAGE_DELAY_MS = detectFollowingDelayMs();
 
 if (typeof window !== "undefined") {
   window.__FOLLOWING_DEBUG__ = {
     level: FOLLOWING_DEBUG_LEVEL,
-    hint: "Use ?followingDebug=1 for verbose logs, ?followingDebug=0 to mute.",
+    delayMs: FOLLOWING_PAGE_DELAY_MS,
+    hint: "Параметры: ?followingDebug=1, ?followingDelayMs=1500, ?clientIntegrity=..., ?deviceId=...",
   };
 }
 
@@ -64,6 +68,25 @@ function detectFollowingDebugLevel() {
   }
   // default: warnings/errors only
   return 1;
+}
+
+function detectFollowingDelayMs() {
+  const fallback = 1500;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const fromQuery = Number(params.get("followingDelayMs"));
+    if (Number.isFinite(fromQuery)) {
+      return Math.max(0, Math.min(10_000, Math.floor(fromQuery)));
+    }
+
+    const fromStorage = Number(localStorage.getItem("followingDelayMs"));
+    if (Number.isFinite(fromStorage)) {
+      return Math.max(0, Math.min(10_000, Math.floor(fromStorage)));
+    }
+  } catch {
+    // ignore
+  }
+  return fallback;
 }
 
 function logFollowingDebug(level, message, context) {
@@ -111,6 +134,10 @@ function shortCursor(cursor) {
   if (!cursor) return "";
   const value = String(cursor);
   return value.length > 18 ? `${value.slice(0, 8)}...${value.slice(-8)}` : value;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function handleLookup(event) {
@@ -193,7 +220,7 @@ async function handleLookup(event) {
     renderFollowingCards(followingRows, followingMeta);
   }
   if (modVipRes.status === "fulfilled") {
-    renderRoleCards(els.vipsOut, vipRows, "VIP не найдены", "vip");
+    renderRoleCards(els.vipsOut, vipRows, "Випы не найдены", "vip");
     renderRoleCards(els.modsOut, modRows, "Модераторы не найдены", "mod");
   }
   if (foundersRes.status === "fulfilled") {
@@ -208,7 +235,7 @@ async function handleLookup(event) {
   if (failures === 0 && !hasWarnings) {
     setStatus("Готово. Данные загружены.", "ok");
   } else if (failures === 0 && hasWarnings) {
-    setStatus("Данные загружены частично: Twitch ограничил часть страниц following.", "error");
+    setStatus("Данные загружены частично: Twitch ограничил часть страниц подписок.", "error");
   } else if (failures < 3) {
     setStatus("Часть данных загружена, часть запросов завершилась ошибкой.", "error");
   } else {
@@ -274,7 +301,7 @@ function renderEmptyState() {
 function renderSummary(counters) {
   const cards = [
     { label: "Подписки", value: counters.following },
-    { label: "VIP", value: counters.vips },
+    { label: "Випы", value: counters.vips },
     { label: "Модераторы", value: counters.mods },
     { label: "Основатели", value: counters.founders },
   ];
@@ -319,7 +346,7 @@ function renderRoleCards(target, rows, emptyText, roleType) {
 function renderUserGrid(target, rows, options) {
   const body = rows
     .map((row) => {
-      const title = row.displayName || row.login || "unknown";
+      const title = row.displayName || row.login || "неизвестно";
       const founderBadge =
         options.roleType === "founder" ? renderFounderBadge(row.isSubscribed) : "";
       let subtitle = "";
@@ -405,6 +432,17 @@ async function fetchFollowingViaFollowsQuery(login, run) {
 
   while (true) {
     pageIndex += 1;
+
+    if (pageIndex > 1 && FOLLOWING_PAGE_DELAY_MS > 0) {
+      logFollowingDebug("info", "Applying inter-page delay", {
+        runId: run?.runId || "",
+        login,
+        pageIndex,
+        delayMs: FOLLOWING_PAGE_DELAY_MS,
+      });
+      await sleep(FOLLOWING_PAGE_DELAY_MS);
+    }
+
     const payload = {
       operationName: "UserFollows",
       variables: { login, first: 100, after: cursor },
@@ -506,6 +544,17 @@ async function fetchFollowingViaLegacyQuery(login, run) {
 
   while (true) {
     pageIndex += 1;
+
+    if (pageIndex > 1 && FOLLOWING_PAGE_DELAY_MS > 0) {
+      logFollowingDebug("info", "Applying inter-page delay", {
+        runId: run?.runId || "",
+        login,
+        pageIndex,
+        delayMs: FOLLOWING_PAGE_DELAY_MS,
+      });
+      await sleep(FOLLOWING_PAGE_DELAY_MS);
+    }
+
     const payload = {
       operationName: "UserFollowing",
       variables: { login, first: 100, after: cursor },
@@ -602,11 +651,11 @@ function normalizeFollowingError(error) {
   const msg = humanError(error).toLowerCase();
   if (msg.includes("failed integrity check")) {
     logFollowingDebug("warn", "normalizeFollowingError: failed integrity check", { error: msg });
-    return new Error("Twitch blocked following pagination (failed integrity check).");
+    return new Error("Twitch ограничил пагинацию подписок (failed integrity check).");
   }
   if (msg.includes("service error")) {
     logFollowingDebug("warn", "normalizeFollowingError: service error", { error: msg });
-    return new Error("Twitch temporarily limits public following data.");
+    return new Error("Twitch временно ограничивает публичные данные подписок.");
   }
   if (msg.includes("failed to fetch") || msg.includes("networkerror")) {
     logFollowingDebug("warn", "normalizeFollowingError: network or CORS issue", { error: msg });
@@ -637,7 +686,7 @@ async function postGql(payload, debugMeta = {}) {
 }
 
 async function postGqlOnce(payload, forceRefreshIntegrity, debugMeta = {}) {
-  const headers = await buildGqlHeaders(forceRefreshIntegrity);
+  const headers = await buildGqlHeaders(forceRefreshIntegrity, debugMeta);
 
   let response;
   try {
@@ -671,7 +720,7 @@ async function postGqlOnce(payload, forceRefreshIntegrity, debugMeta = {}) {
       statusText: response.statusText,
       bodyPreview,
     });
-    throw new Error(`Following: HTTP ${response.status}`);
+    throw new Error(`Подписки: HTTP ${response.status}`);
   }
 
   return response.json();
@@ -679,12 +728,24 @@ async function postGqlOnce(payload, forceRefreshIntegrity, debugMeta = {}) {
 
 function gqlErrorMessage(json) {
   if (!Array.isArray(json?.errors) || json.errors.length === 0) return "";
-  return json.errors.map((x) => x?.message || "Unknown GQL error").join("; ");
+  return json.errors.map((x) => x?.message || "Неизвестная ошибка GQL").join("; ");
 }
 
-async function buildGqlHeaders(forceRefreshIntegrity = false) {
-  const deviceId = getOrCreateDeviceId();
-  const token = await getIntegrityToken(deviceId, forceRefreshIntegrity);
+async function buildGqlHeaders(forceRefreshIntegrity = false, debugMeta = {}) {
+  const deviceId = getDeviceIdForRequest();
+  const manualToken = getManualIntegrityToken();
+  let token = "";
+  let integritySource = "none";
+
+  if (manualToken) {
+    token = manualToken;
+    integritySource = "manual";
+  } else {
+    const tokenInfo = await getIntegrityToken(deviceId, forceRefreshIntegrity, debugMeta);
+    token = tokenInfo.token;
+    integritySource = tokenInfo.source;
+  }
+
   const headers = {
     "Client-ID": TWITCH_GQL_CLIENT_ID,
     "Content-Type": "application/json",
@@ -692,10 +753,20 @@ async function buildGqlHeaders(forceRefreshIntegrity = false) {
     "X-Device-Id": deviceId,
   };
   if (token) headers["Client-Integrity"] = token;
+
+  logFollowingDebug("info", "Built GQL headers", {
+    ...debugMeta,
+    forceRefreshIntegrity,
+    deviceIdSuffix: deviceId.slice(-8),
+    hasIntegrity: Boolean(token),
+    integritySource,
+    integrityLength: token ? token.length : 0,
+  });
+
   return headers;
 }
 
-async function getIntegrityToken(deviceId, forceRefresh = false) {
+async function getIntegrityToken(deviceId, forceRefresh = false, debugMeta = {}) {
   const now = Date.now();
   if (
     !forceRefresh &&
@@ -703,7 +774,7 @@ async function getIntegrityToken(deviceId, forceRefresh = false) {
     Number.isFinite(integrityState.expiration) &&
     integrityState.expiration - 30_000 > now
   ) {
-    return integrityState.token;
+    return { token: integrityState.token, source: "cached" };
   }
 
   try {
@@ -711,18 +782,87 @@ async function getIntegrityToken(deviceId, forceRefresh = false) {
       method: "POST",
       headers: {
         "Client-ID": TWITCH_GQL_CLIENT_ID,
+        "Client-Integrity": "v4.local.QA8rqFqQgjWbDvDKFeLmJHbh1AzRWcjwJBoJlLG4QxvXc96QnLQZlXOJH7Bzc82B1JYp5B4sa51s4rgJzzOzUFrxdfWaPDOqDHybuEwFRL6XkclRNFQya4_Viq6i0QaC7nmjicDpiXSn3k9J0ZZPAIMr-sXKZHG9QBknqNX188Vuog1yqj0tB_A2hodIfHsAVUdgxZWR8wEq4NAEuAMDTw3rXK8-yQS9n5HJH4NiBsk8mQGNdBKq8h-7NdDkRD5I0VoZL7rcfkXVTe1RGE02rkrxTgLeghYq_8X7pWPaPYcEfNeCGMCGj0iQ9geg4yepN_m2VuRYs_Cb28qzUVPE7RiSmdFJDpFDYBoKYZP6KZkKCK4KGgt6AuOJMm182M9KPcK__aVd5xWLXp4dP-TcYuQgNqIjC_sHBcm9Mzg-F0QBVA2rJ7cge_VDf7ctFot5USrFKxrc7Mg_E4w5XA",
         "Device-ID": deviceId,
         "X-Device-Id": deviceId,
       },
     });
-    if (!response.ok) return "";
+    if (!response.ok) {
+      logFollowingDebug("warn", "Integrity endpoint non-OK response", {
+        ...debugMeta,
+        status: response.status,
+        statusText: response.statusText,
+      });
+      return { token: "", source: "none" };
+    }
     const json = await response.json();
     integrityState.token = typeof json?.token === "string" ? json.token : "";
     integrityState.expiration = Number(json?.expiration) || now + 60 * 60 * 1000;
-    return integrityState.token;
-  } catch {
-    return "";
+    return { token: integrityState.token, source: integrityState.token ? "fetched" : "none" };
+  } catch (error) {
+    logFollowingDebug("warn", "Integrity endpoint request failed", {
+      ...debugMeta,
+      error: humanError(error),
+    });
+    return { token: "", source: "none" };
   }
+}
+
+function getDeviceIdForRequest() {
+  const override = getDeviceIdOverride();
+  if (override) return override;
+  return getOrCreateDeviceId();
+}
+
+function getDeviceIdOverride() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const fromQuery = sanitizeDeviceId(params.get("deviceId"));
+    if (fromQuery) return fromQuery;
+  } catch {
+    // ignore
+  }
+
+  try {
+    const fromStorage = sanitizeDeviceId(localStorage.getItem(DEVICE_ID_OVERRIDE_STORAGE_KEY));
+    if (fromStorage) return fromStorage;
+  } catch {
+    // ignore
+  }
+
+  return "";
+}
+
+function sanitizeDeviceId(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (/^[a-f0-9]{32}$/i.test(raw)) return raw.toLowerCase();
+  return "";
+}
+
+function getManualIntegrityToken() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const fromQuery = sanitizeIntegrityToken(params.get("clientIntegrity"));
+    if (fromQuery) return fromQuery;
+  } catch {
+    // ignore
+  }
+
+  try {
+    const fromStorage = sanitizeIntegrityToken(localStorage.getItem(INTEGRITY_TOKEN_STORAGE_KEY));
+    if (fromStorage) return fromStorage;
+  } catch {
+    // ignore
+  }
+
+  return "";
+}
+
+function sanitizeIntegrityToken(value) {
+  const raw = String(value || "").trim();
+  if (raw.length < 20) return "";
+  return raw;
 }
 
 function getOrCreateDeviceId() {
@@ -854,7 +994,7 @@ function applyProfileMap(rows, profileMap) {
     const profile = profileMap.get(key);
     return {
       ...row,
-      displayName: row.displayName || profile?.displayName || row.login || "unknown",
+      displayName: row.displayName || profile?.displayName || row.login || "неизвестно",
       avatarUrl: row.avatarUrl || profile?.avatarUrl || "",
     };
   });
@@ -870,7 +1010,7 @@ async function fetchJson(url) {
   }
   const json = await response.json();
   if (typeof json?.status === "number" && json.status >= 400) {
-    throw new Error(json.message || `API error: ${json.status}`);
+    throw new Error(json.message || `Ошибка API: ${json.status}`);
   }
   return json;
 }
@@ -901,8 +1041,8 @@ function normalizeRoleEntry(raw, role) {
     "login",
   ]);
   return {
-    login: login || normalizeLogin(displayName) || "unknown",
-    displayName: displayName || login || "unknown",
+    login: login || normalizeLogin(displayName) || "неизвестно",
+    displayName: displayName || login || "неизвестно",
     avatarUrl: "",
     dateRaw: firstValue(raw, dateFieldsByRole(role)),
     isSubscribed: role === "founder" ? parseBooleanOrNull(firstValue(raw, ["isSubscribed"])) : null,
