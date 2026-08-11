@@ -782,7 +782,7 @@ async function getIntegrityToken(deviceId, forceRefresh = false, debugMeta = {})
       method: "POST",
       headers: {
         "Client-ID": TWITCH_GQL_CLIENT_ID,
-        "Client-Integrity": "v4.local.lUkh6prByRjj01Ht0KElR9dG0oyKcT_FCtA_xIT5Uchbkf4T2bCM2GYklaelRz0aV5Fwpgqg_jX5T4YsZLedf8Gk3DxtBO8hs4kiy64r49wcHpzHeqYr2nAKmluLM7cVj09aVtjZLdY519SyPFqCAEmrVzEORi3jBZqfSQzogefop5zPkxl-eY8HQZd3grgQQeMlSL--mh7tGdlRfQjCLh8Z6jrUxX5UxS5D3shiqaRy6YyIIbX8OTKgTq-MprpsG7VkfGBM1KNvgpQOHPuMkn2FZdIK_BGUmaiLwQMQddmKCfNIHR-YSKkRQWYTWArBSquU9i1zeCVaUHkbrV37EC9zG0HKJT-hDEEHGNqAuSaqFpoC_LLiPOBXadeB7pusy76xwh1657FTIu6_OqXanY9baJlmyP8iOfpKAvRt0kOuc1JMiLA6YLZkKFY8dZ1glw",
+        "Client-Integrity": "v4.local.JA0WJcirwtlptYNHdjIJ4UtOunHkZYwi_0s8teGEnNnr0SV-jY-BTTpjHhRA8hHUsiJB9lG52t4Hp2moDh22CdclncOdPhfssg5duzb7pbWd0xarpG5IelJKRtpeGr8QgrtDY8F9a3ao9S8jzEGm9p5wA9rDGovhg8As4t9BeA6iB6fswROCrfTwlRMgbN7Teu0VIz1wC2xfVdFyQQ4PPaN7_fol7FkMdX3mRlBQPtaGdCqMEBTVMeIoARVvUMcoosZdRHsDE7aDhYUPzSpiYHdTr1eRNqZAIWqetQjraGamlxXu8IoVUv12exqdcwZWpPIpod7nfZ8CwYq_75h6emJisMc3z2DNqo-CVnVapsJ47mu7ppVm9BsgesFZlOB78ND7YcULqXkOdQM7dD9u0bmUnwKBdxl1rzUXUi3lw07rX-Ios4uujUuVceli8B6KqjN_r3ISYiDkd-dq",
         "Device-ID": deviceId,
         "X-Device-Id": deviceId,
       },
