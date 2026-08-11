@@ -734,6 +734,7 @@ function gqlErrorMessage(json) {
 async function buildGqlHeaders(forceRefreshIntegrity = false, debugMeta = {}) {
   const deviceId = getDeviceIdForRequest();
   const manualToken = getManualIntegrityToken();
+  const authToken = localStorage.getItem("twitch-tools-auth-token") || "";
   let token = "";
   let integritySource = "none";
 
@@ -753,12 +754,14 @@ async function buildGqlHeaders(forceRefreshIntegrity = false, debugMeta = {}) {
     "X-Device-Id": deviceId,
   };
   if (token) headers["Client-Integrity"] = token;
+  if (authToken) headers["Authorization"] = authToken;
 
   logFollowingDebug("info", "Built GQL headers", {
     ...debugMeta,
     forceRefreshIntegrity,
     deviceIdSuffix: deviceId.slice(-8),
     hasIntegrity: Boolean(token),
+    hasAuthToken: Boolean(authToken),
     integritySource,
     integrityLength: token ? token.length : 0,
   });
